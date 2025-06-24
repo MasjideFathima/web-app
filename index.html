@@ -44,11 +44,8 @@
       font-size: 16px;
       border: 1px solid #ccc;
       border-radius: 6px;
+      box-sizing: border-box;
     }
-    /* .signature-section {
-      margin-top: 40px;
-      text-align: right;
-    } */
     .signature-line {
       margin-top: 60px;
       border-top: 1px solid #000;
@@ -141,7 +138,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <img src="jaqh-transparent.png" />
+      <img src="https://jaqh.org.in/wp-content/uploads/2024/02/jaqh-transparent.png" alt="JAQH Logo" />
       <h2>جامعة أهل القرآن والحديث</h2>
       <h2>ஜமிய்யத்து அஹ்லில் குர்ஆன் வல் ஹதீஸ்</h2>
       <h3>JAMIYYATHU AHLIL QUR'AN VAL HADEES</h3>
@@ -172,9 +169,6 @@
         <label for="year">Year</label>
         <select id="year" name="year" required>
           <option value="">Select</option>
-          <option value="">2025</option>
-          <option value="">2026</option>
-          <option value="">2027</option>
         </select>
       </div>
       <div class="form-group">
@@ -183,9 +177,6 @@
           <option value="Income">Income</option>
         </select>
       </div>
-      <!-- <div class="signature-section">
-        <div class="signature-line">B.O Secretary / Treasurer</div>
-      </div> -->
       <button class="submit-btn" type="submit">Submit & Generate PDF</button>
     </form>
     <button class="submit-btn" onclick="window.location.href='income_expense_form.html';">
@@ -196,125 +187,118 @@
 
   <script>
     window.onload = function() {
-      document.getElementById('date').max = new Date().toISOString().split("T")[0];
+      // Set default date to today and prevent future dates
+      const today = new Date();
+      const dateInput = document.getElementById('date');
+      dateInput.value = today.toISOString().split("T")[0];
+      dateInput.max = today.toISOString().split("T")[0];
+
+      // Populate year dropdown
       const yearSelect = document.getElementById('year');
-      for (let y = 2024; y <= 2034; y++) {
+      const currentYear = today.getFullYear();
+      for (let y = currentYear; y <= currentYear + 10; y++) {
         const option = document.createElement('option');
         option.value = y;
         option.textContent = y;
         yearSelect.appendChild(option);
       }
+      yearSelect.value = currentYear; // Set default year to current year
     }
 
-function handleSubmit(e) {
-  e.preventDefault();
-  const form = document.getElementById('donationForm');
-  const formData = new FormData(form);
-  const data = Object.fromEntries(formData.entries());
+    function handleSubmit(e) {
+      e.preventDefault();
+      const form = document.getElementById('donationForm');
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
 
-  // Open popup immediately to avoid being blocked
-  const pdfWindow = window.open('', '_blank');
-  if (!pdfWindow) {
-    alert('Popup blocked! Please allow popups for this site.');
-    return;
-  }
+      // *** FIX: Open the window immediately on user click ***
+      const pdfWindow = window.open('', '_blank');
+      if (pdfWindow) {
+          pdfWindow.document.write('<body><p>Submitting data and generating receipt... Please wait.</p></body>');
+      } else {
+          alert('Popup blocked! Please allow popups for this site to generate the receipt.');
+          return;
+      }
 
-  fetch('https://script.google.com/macros/s/AKfycbw7Cpj6pPHcN1W7-hGHriEfSdFYLlUxrj6mkQVwvukmZg1xXz8wmRaIdxEN-LjGDXjo/exec', {
-    method: 'POST',
-    body: new URLSearchParams(data)
-  })
-  .then(response => response.text())
-  .then(text => {
-    showToast("Data Submitted Successfully");
-    generatePDF(data, pdfWindow);  // pass the already opened window here
-    form.reset();
-  })
-  .catch(error => {
-    pdfWindow.close();  // close popup if error
-    alert('Submission failed: ' + error);
-  });
-}
+      fetch('https://script.google.com/macros/s/AKfycbw7Cpj6pPHcN1W7-hGHriEfSdFYLlUxrj6mkQVwvukmZg1xXz8wmRaIdxEN-LjGDXjo/exec', {
+        method: 'POST',
+        body: new URLSearchParams(data)
+      })  
+      .then(response => {
+        if (!response.ok) {
+           // If the response is not OK, throw an error to be caught by .catch
+           throw new Error('Network response was not ok.');
+        }
+        return response.text();
+      })
+      .then(text => {
+        showToast("Data Submitted Successfully");
+        // *** FIX: Pass the opened window to the PDF generation function ***
+        generatePDF(data, pdfWindow);
+        document.getElementById("donationForm").reset();
+        // Reset date and year to default after submission
+        window.onload(); 
+      })
+      .catch(error => {
+        alert('Submission failed: ' + error);
+        // Close the popup if the submission fails
+        if(pdfWindow) {
+            pdfWindow.close();
+        }
+      });
+    }
 
-function generatePDF(data, pdfWindow) {
-  const htmlContent = `
-    <html>
-      <head>
-        <style>
-          body {
-            font-family: Arial;
-            padding: 30px;
-            background-color: #e9f9e9;
-          }
-          .box {
-            border: 4px solid green;
-            border-radius: 10px;
-            padding: 20px;
-            width: 700px;
-            margin: auto;
-            font-size: 16px;
-            background: #ffffff;
-          }
-          .logo {
-            text-align: left;
-          }
-          .logo img {
-            height: 100px;
-          }
-          .head {
-            text-align: center;
-            margin-top: -70px;
-            color: #005500;
-            line-height: 1.4;
-          }
-          .field {
-            margin-top: 15px;
-          }
-          .label {
-            display: inline-block;
-            width: 250px;
-            font-weight: bold;
-          }
-          .footer {
-            margin-top: 60px;
-            text-align: right;
-            color: #333;
-            font-weight: bold;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="box">
-          <div class="logo">
-            <img src="jaqh-transparent.png" />
-          </div>
-          <div class="head">
-            <div><strong>جامعة أهل القرآن والحديث</strong></div>
-            <div><strong>ஜமிய்யத்து அஹ்லில் குர்ஆன் வல் ஹதீஸ்</strong></div>
-            <div><strong>JAMIYYATHU AHLIL QUR'AN VAL HADEES</strong></div>
-            <div>H.o: #61/26, Ayyasamy Street, Pudupet, Chennai - 600 002.</div>
-          </div>
-          <div class="field"><span class="label">Received with thanks from JANAB</span>: ${data.receivedFrom}</div>
-          <div class="field"><span class="label">Towards Donation for</span>: ${data.donatedFor}</div>
-          <div class="field"><span class="label">Rupees</span>: ₹${data.amount}</div>
-          <div class="field"><span class="label">Collected By</span>: ${data.collectedBy}</div>
-          <div class="field"><span class="label">Date</span>: ${data.date}</div>
-          <div class="field"><span class="label">Year</span>: ${data.year}</div>
-          <div class="footer">B.O Secretary / Treasurer</div>
-        </div>
-      </body>
-    </html>
-  `;
-
-  pdfWindow.document.open();
-  pdfWindow.document.write(htmlContent);
-  pdfWindow.document.close();
-
-  // Delay print to ensure content is rendered before print dialog
-  setTimeout(() => {
-    pdfWindow.print();
-  }, 300);
-}
-
+    function showToast() {
+      const toast = document.getElementById("toast");
+      toast.className = "toast show";
+      setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+    }
+    
+    // *** FIX: Function now accepts the window object as an argument ***
+    function generatePDF(data, pdfWindow) {
+      const htmlContent = `
+        <html>
+          <head>
+            <title>Donation Receipt</title>
+            <style>
+              body { font-family: Arial; padding: 30px; background-color: #e9f9e9; }
+              .box { border: 4px solid green; border-radius: 10px; padding: 20px; width: 700px; margin: auto; font-size: 16px; background: #ffffff; }
+              .logo { text-align: left; }
+              .logo img { height: 100px; }
+              .head { text-align: center; margin-top: -70px; color: #005500; line-height: 1.4; }
+              .field { margin-top: 15px; }
+              .label { display: inline-block; width: 250px; font-weight: bold; }
+              .footer { margin-top: 60px; text-align: right; color: #333; font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <div class="box">
+              <div class="logo">
+                <img src="https://jaqh.org.in/wp-content/uploads/2024/02/jaqh-transparent.png" />
+              </div>
+              <div class="head">
+                <div><strong>جامعة أهل القرآن والحديث</strong></div>
+                <div><strong>ஜமிய்யத்து அஹ்லில் குர்ஆன் வல் ஹதீஸ்</strong></div>
+                <div><strong>JAMIYYATHU AHLIL QUR'AN VAL HADEES</strong></div>
+                <div>H.o: #61/26, Ayyasamy Street, Pudupet, Chennai - 600 002.</div>
+              </div>
+              <div class="field"><span class="label">Received with thanks from JANAB</span>: ${data.receivedFrom}</div>
+              <div class="field"><span class="label">Towards Donation for</span>: ${data.donatedFor}</div>
+              <div class="field"><span class="label">Rupees</span>: ₹${data.amount}</div>
+              <div class="field"><span class="label">Collected By</span>: ${data.collectedBy}</div>
+              <div class="field"><span class="label">Date</span>: ${new Date(data.date).toLocaleDateString('en-GB')}</div>
+              <div class="field"><span class="label">Year</span>: ${data.year}</div>
+              <div class="footer">B.O Secretary / Treasurer</div>
+            </div>
+          </body>
+        </html>
+      `;
+      // Write content to the already opened window
+      pdfWindow.document.open();
+      pdfWindow.document.write(htmlContent);
+      pdfWindow.document.close();
+      pdfWindow.print();
+    }
   </script>
 </body>
 </html>
