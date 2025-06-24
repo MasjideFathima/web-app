@@ -172,7 +172,6 @@
         <label for="year">Year</label>
         <select id="year" name="year" required>
           <option value="">Select</option>
-          <!-- Year options will be appended here dynamically -->
         </select>
       </div>
       <div class="form-group">
@@ -191,10 +190,9 @@
     </button>
   </div>
   <div id="toast" class="toast">Form submitted successfully!</div>
-  <!-- jsPDF CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <script>
-    window.onload = function () {
+    window.onload = function() {
       document.getElementById('date').max = new Date().toISOString().split("T")[0];
       const yearSelect = document.getElementById('year');
       for (let y = 2024; y <= 2034; y++) {
@@ -203,7 +201,7 @@
         option.textContent = y;
         yearSelect.appendChild(option);
       }
-    };
+    }
 
     function handleSubmit(e) {
       e.preventDefault();
@@ -211,89 +209,110 @@
       const formData = new FormData(form);
       const data = Object.fromEntries(formData.entries());
 
+      // Open the popup immediately on user click
+      const pdfWindow = window.open('', '_blank');
+      if (!pdfWindow) {
+        alert('Popup blocked! Please allow popups for this site.');
+        return;
+      }
+
       fetch('https://script.google.com/macros/s/AKfycbw7Cpj6pPHcN1W7-hGHriEfSdFYLlUxrj6mkQVwvukmZg1xXz8wmRaIdxEN-LjGDXjo/exec', {
         method: 'POST',
         body: new URLSearchParams(data)
+        // body: new FormData(formData)
+      })  
+      .then(response => response.text())
+      .then(text => {
+        showToast("Data Submitted Successfully");
+        generatePDF(data, pdfWindow);
+        document.getElementById("donationForm").reset();
       })
-        .then(response => response.text())
-        .then(text => {
-          showToast("Data Submitted Successfully");
-          generatePDF(data);
-          form.reset();
-        })
-        .catch(error => {
-          alert('Submission failed: ' + error);
-        });
+      .catch(error => {
+        pdfWindow.close(); // Close the blank popup if error
+        alert('Submission failed: ' + error));
+      }
     }
 
     function showToast() {
       const toast = document.getElementById("toast");
       toast.className = "toast show";
-      setTimeout(() => {
-        toast.className = toast.className.replace("show", "");
-      }, 3000);
+      setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
     }
 
-    async function generatePDF(data) {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-
-      // ✅ Base64 logo placeholder – replace this with your actual Base64 image string
-      const logoBase64 = 'data:image/png;base64,REPLACE_WITH_YOUR_BASE64_IMAGE';
-
-      // ✅ Add logo to top-left
-      doc.addImage(logoBase64, 'PNG', 15, 10, 30, 30);
-
-      // ✅ Header content (centered)
-      doc.setFontSize(18);
-      doc.setFont("helvetica", "bold");
-      doc.text("JAMIYYATHU AHLIL QUR'AN VAL HADEES", 105, 20, null, null, "center");
-
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
-      doc.text("جامعة أهل القرآن والحديث", 105, 27, null, null, "center");
-      doc.text("ஜமிய்யத்து அஹ்லில் குர்ஆன் வல் ஹதீஸ்", 105, 34, null, null, "center");
-      doc.text("H.o: #61/26, Ayyasamy Street, Pudupet, Chennai - 600 002.", 105, 40, null, null, "center");
-
-      // ✅ Draw a bordered box for receipt content
-      doc.setLineWidth(0.5);
-      doc.roundedRect(15, 50, 180, 110, 5, 5);
-
-      // ✅ Receipt title
-      doc.setFont("helvetica", "bold");
-      doc.text("Donation Receipt", 105, 58, null, null, "center");
-
-      // ✅ Content fields
-      let y = 70;
-      const leftX = 25;
-      const labelX = leftX;
-      const valueX = 80;
-
-      const fields = [
-        ["Received From:", data.receivedFrom],
-        ["Donated For:", data.donatedFor],
-        ["Collected By:", data.collectedBy],
-        ["Amount (INR):", `₹${data.amount}`],
-        ["Date:", data.date],
-        ["Year:", data.year]
-      ];
-
-      fields.forEach(([label, value]) => {
-        doc.setFont("helvetica", "bold");
-        doc.text(label, labelX, y);
-        doc.setFont("helvetica", "normal");
-        doc.text(value || "", valueX, y);
-        y += 10;
-      });
-
-      // ✅ Signature line
-      y += 20;
-      doc.line(140, y, 180, y); // signature line
-      doc.setFontSize(10);
-      doc.text("Secretary / Treasurer", 145, y + 5);
-
-      // ✅ Save the PDF
-      doc.save(`DonationReceipt_${data.receivedFrom || "Donor"}.pdf`);
+    function generatePDF(data, pdfWindow) {
+      // const pdfWindow = window.open('', '_blank');
+      const htmlContent = `
+        <html>
+          <head>
+            <style>
+              body {
+                font-family: Arial;
+                padding: 30px;
+                background-color: #e9f9e9;
+              }
+              .box {
+                border: 4px solid green;
+                border-radius: 10px;
+                padding: 20px;
+                width: 700px;
+                margin: auto;
+                font-size: 16px;
+                background: #ffffff;
+              }
+              .logo {
+                text-align: left;
+              }
+              .logo img {
+                height: 100px;
+              }
+              .head {
+                text-align: center;
+                margin-top: -70px;
+                color: #005500;
+                line-height: 1.4;
+              }
+              .field {
+                margin-top: 15px;
+              }
+              .label {
+                display: inline-block;
+                width: 250px;
+                font-weight: bold;
+              }
+              .footer {
+                margin-top: 60px;
+                text-align: right;
+                color: #333;
+                font-weight: bold;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="box">
+              <div class="logo">
+                <img src="jaqh-transparent.png" />
+              </div>
+              <div class="head">
+                <div><strong>جامعة أهل القرآن والحديث</strong></div>
+                <div><strong>ஜமிய்யத்து அஹ்லில் குர்ஆன் வல் ஹதீஸ்</strong></div>
+                <div><strong>JAMIYYATHU AHLIL QUR'AN VAL HADEES</strong></div>
+                <div>H.o: #61/26, Ayyasamy Street, Pudupet, Chennai - 600 002.</div>
+              </div>
+              <div class="field"><span class="label">Received with thanks from JANAB</span>: ${data.receivedFrom}</div>
+              <div class="field"><span class="label">Towards Donation for</span>: ${data.donatedFor}</div>
+              <div class="field"><span class="label">Rupees</span>: ₹${data.amount}</div>
+              <div class="field"><span class="label">Collected By</span>: ${data.collectedBy}</div>
+              <div class="field"><span class="label">Date</span>: ${data.date}</div>
+              <div class="field"><span class="label">Year</span>: ${data.year}</div>
+              <div class="footer">B.O Secretary / Treasurer</div>
+            </div>
+          </body>
+        </html>
+      `;
+      pdfWindow.document.open();
+      pdfWindow.document.write(htmlContent);
+      pdfWindow.document.close();
+      pdfWindow.print();
     }
   </script>
 </body>
