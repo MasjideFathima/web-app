@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voucher Entry</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 40px;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header img {
+            height: 150px;
+        }
+        .header h2 {
+            margin: 10px 0;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        .submit-btn, .link-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            font-size: 18px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 30px;
+            position: relative;
+            text-align: center;
+            text-decoration: none;
+        }
+        .submit-btn:disabled {
+            background-color: #999;
+            cursor: not-allowed;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none;
+        }
+        .submit-btn.loading .loading-spinner {
+            display: block;
+        }
+        @keyframes spin {
+            0% { transform: translateY(-50%) rotate(0deg); }
+            100% { transform: translateY(-50%) rotate(360deg); }
+        }
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            margin-left: -125px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 2px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            left: 50%;
+            bottom: 30px;
+            font-size: 17px;
+        }
+        .toast.show {
+            visibility: visible;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+        @keyframes fadein {
+            from { bottom: 0; opacity: 0; }
+            to { bottom: 30px; opacity: 1; }
+        }
+        @keyframes fadeout {
+            from { bottom: 30px; opacity: 1; }
+            to { bottom: 0; opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="jaqh-transparent.png" alt="Logo">
+            <h2>Voucher Entry</h2>
+        </div>
+        <form id="voucherForm" onsubmit="handleSubmit(event)">
+            <div class="form-group">
+                <label for="date">Date</label>
+                <input type="date" name="date" id="date" required />
+            </div>
+            <div class="form-group">
+                <label for="year">Year</label>
+                <select id="year" name="year" required>
+                    <option value="">Select</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="amount">Amount (₹)</label>
+                <input type="number" name="amount" id="amount" required oninput="updateAmountInWords(this.value)" />
+            </div>
+            <div class="form-group" style="display: none;">
+                <label for="amountInWords">Amount in Words</label>
+                <input type="text" name="amountInWords" id="amountInWords" readonly />
+            </div>
+            <div class="form-group">
+                <label for="description">Details (being and debit)</label>
+                <textarea name="description" id="description" rows="3" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="receiverName">Receiver's Name</label>
+                <input type="text" name="receiverName" id="receiverName" required />
+            </div>
+            <div class="form-group">
+                <label for="entryType">Type</label>
+                <select name="entryType" id="entryType" required>
+                    <option value="Expense">Expense</option>
+                </select>
+            </div>
+            <input type="hidden" name="form" value="voucher-form">
+            <button type="submit" class="submit-btn">
+                Submit & Generate PDF
+                <span class="loading-spinner"></span>
+            </button>
+        </form>
+        <a href="index.html" class="link-btn">Back to Donation Form</a>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Combined and corrected window.onload function
+        window.onload = function() {
+            const today = new Date();
+            const dateInput = document.getElementById('date');
+            dateInput.value = today.toISOString().split("T")[0]; // Set default date
+            dateInput.max = today.toISOString().split("T")[0]; // Prevent future dates
+
+            const yearSelect = document.getElementById('year');
+            yearSelect.innerHTML = '<option value="">Select</option>'; // Clear existing options
+            for (let y = 2024; y <= 2034; y++) { // Populate years from 2024 to 2034
+                const option = document.createElement('option');
+                option.value = y;
+                option.textContent = y;
+                yearSelect.appendChild(option);
+            }
+            yearSelect.value = today.getFullYear(); // Set current year as default selected
+        };
+
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.className = "toast show";
+            setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        // Updated numberToWords function (same as before, but included for completeness)
+        function numberToWords(num) {
+            const a = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+            const b = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+            
+            let parts = num.toString().split('.');
+            let wholeNum = parseInt(parts[0]);
+            let decimalNum = parts[1] ? parseInt(parts[1]) : 0; 
+            if (decimalNum.toString().length === 1) {
+                decimalNum *= 10;
+            }
+
+            if (wholeNum.toString().length > 9) return 'overflow';
+            let n = ('000000000' + wholeNum).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+            if (!n) return; 
+            let str = '';
+            str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + ' crore ' : '';
+            str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + ' lakh ' : '';
+            str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + ' thousand ' : '';
+            str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + ' hundred ' : '';
+            str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+            
+            str = str.trim().replace(/\s+/g, ' ').split(' ').map(s => s.charAt(0).toUpperCase() + s.substring(1)).join(' ');
+
+            if (decimalNum > 0) {
+                let paisaStr = '';
+                if (decimalNum < 20) {
+                    paisaStr = a[decimalNum];
+                } else {
+                    paisaStr = b[Math.floor(decimalNum / 10)] + (decimalNum % 10 !== 0 ? ' ' + a[decimalNum % 10] : '');
+                }
+                paisaStr = paisaStr.trim().split(' ').map(s => s.charAt(0).toUpperCase() + s.substring(1)).join(' ');
+                str += (str ? ' Rupees And ' : '') + paisaStr + ' Paisa';
+            } else if (wholeNum > 0 || num === 0) {
+                str += ' Rupees';
+            }
+            
+            return str + ' Only';
+        }
+
+        // Function to update the hidden "amount in words" field
+        function updateAmountInWords(amount) {
+            const amountInWordsInput = document.getElementById('amountInWords');
+            if (amount && !isNaN(amount)) {
+                amountInWordsInput.value = numberToWords(parseFloat(amount));
+            } else {
+                amountInWordsInput.value = '';
+            }
+        }
+
+        // Handle form submission
+        function handleSubmit(e) {
+            e.preventDefault();
+            const form = document.getElementById('voucherForm');
+            const button = document.querySelector('.submit-btn');
+
+            button.disabled = true;
+            button.classList.add('loading');
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries()); // `data` now contains all form fields
+
+            // Open a new window for the PDF
+            const pdfWindow = window.open('', '_blank');
+            if (pdfWindow) {
+                pdfWindow.document.write('<body><p>Generating voucher... Please wait.</p></body>');
+            } else {
+                alert('Popup blocked! Please allow popups for this site to generate the voucher.');
+                button.disabled = false;
+                button.classList.remove('loading');
+                return;
+            }
+
+            // Send data to Google Apps Script
+            const scriptData = new URLSearchParams(formData); // This correctly sends all form data
+            fetch('https://script.google.com/macros/s/AKfycbw7Cpj6pPHcN1W7-hGHriEfSdFYLlUxrj6mkQVwvukmZg1xXz8wmRaIdxEN-LjGDXjo/exec', {
+                method: 'POST',
+                body: scriptData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok.');
+                return response.text();
+            })
+            .then(text => {
+                showToast("Data Submitted Successfully");
+                // Now, generate the PDF using the 'data' object which contains all form values
+                generateVoucherPDF(data, pdfWindow);
+                form.reset(); // Clear the form
+                window.onload(); // Reset date and year dropdowns to defaults after submission
+            })
+            .catch(error => {
+                showToast("Submission failed");
+                console.error('Submission error:', error);
+                if (pdfWindow) pdfWindow.close(); // Close PDF window on error
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.classList.remove('loading');
+            });
+        }
+
+        // PDF generation function - now uses the 'data' object directly
+        function generateVoucherPDF(data, pdfWindow) {
+            // Format the date for display (e.g., "01/07/2025")
+            const displayDate = new Date(data.date).toLocaleDateString('en-GB');
+            // Format the amount for display (e.g., "12,345.67")
+            const displayAmount = parseFloat(data.amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            // The amount in words comes directly from the hidden input field in the form
+            const displayAmountInWords = data.amountInWords;
+
+            const htmlContent = `
+                <html>
+                <head>
+                    <title>Cash Voucher</title>
+                    <style>
+                        body { font-family: 'Times New Roman', Times, serif; font-size: 14px; margin: 20px; }
+                        .voucher-box {
+                            border: 2px solid #000;
+                            padding: 20px;
+                            width: 800px;
+                            margin: auto;
+                            box-sizing: border-box;
+                            position: relative;
+                        }
+                        .header {
+                            text-align: center;
+                            margin-bottom: 20px;
+                            position: relative;
+                            padding-top: 80px;
+                            min-height: 100px;
+                        }
+                        .header img {
+                            height: 80px;
+                            position: absolute;
+                            left: 0;
+                            top: 0;
+                            width: 80px;
+                        }
+                        .header h2 { font-size: 24px; margin: 0; padding-top: 0; }
+                        .header p { margin: 2px 0; font-size: 12px; }
+                        .top-right-date {
+                            position: absolute;
+                            top: 20px;
+                            right: 20px;
+                            font-weight: bold;
+                            display: flex;
+                            align-items: baseline;
+                        }
+                        .top-right-date .label {
+                            width: auto;
+                            margin-right: 5px;
+                            font-weight: bold;
+                        }
+                        .top-right-date .content {
+                            flex-grow: 0;
+                        }
+                        .row {
+                            display: flex;
+                            align-items: flex-end;
+                            border-bottom: 1px dotted #000;
+                            padding: 8px 0;
+                        }
+                        .voucher-box > .row:first-of-type {
+                            margin-top: 15px;
+                        }
+                        .row-top-border {
+                            border-top: 2px solid #000;
+                            margin-top: 10px;
+                        }
+                        .label { font-weight: bold; width: 120px; flex-shrink: 0; }
+                        .content { flex-grow: 1; }
+                        .content-right { text-align: right; }
+                        .signatures { display: flex; justify-content: space-between; margin-top: 50px; }
+                        .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 5px; }
+                        .header img[alt="Logo"] {
+                            display: block;
+                            background-color: lightgray;
+                            border: 1px dashed gray;
+                            line-height: 80px;
+                            text-align: center;
+                            font-size: 10px;
+                            color: black;
+                            text-indent: -9999px;
+                            overflow: hidden;
+                        }
+                        .header img[alt="Logo"]::before {
+                            content: "Logo Area";
+                            display: block;
+                            text-indent: 0;
+                            color: black;
+                            font-size: 10px;
+                            line-height: 80px;
+                        }
+                        @media print {
+                            body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            .voucher-box { border: 2px solid #000 !important; box-shadow: none !important; padding: 15px; }
+                            .header { background-color: white; }
+                            .row, .signatures { page-break-inside: avoid; }
+                            .top-right-date { position: absolute; top: 15px; right: 15px; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="voucher-box">
+                        <div class="top-right-date">
+                            <div class="label">Date:</div>
+                            <div class="content">${displayDate}</div>
+                        </div>
+
+                        <div class="header">
+                            <img src="jaqh-transparent.png" alt="Logo">
+                            <h2>CASH VOUCHER</h2>
+                            <p>JAMIYYATHU AHLIL QUR'AN VAL HADEES</p>
+                            <p>H.o: #61/26, Ayyasamy Street, Pudupet, Chennai - 600 002.</p>
+                        </div>
+
+                        <div class="row">
+                            <div class="label">Rs. in words:</div>
+                            <div class="content">${displayAmountInWords}</div>
+                        </div>
+
+                        <div class="row row-top-border">
+                            <div class="label">being and debit:</div>
+                            <div class="content">${data.description}</div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="label" style="width: auto;">Recd. above sum of Rs.</div>
+                            <div class="content" style="width: 150px; text-align: center;"><strong>${displayAmount}</strong></div>
+                            <div class="content"></div>
+                        </div>
+
+                        <div class="signatures">
+                            <div class="signature-box">Authorised by</div>
+                            <div class="signature-box">${data.receiverName}</div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            pdfWindow.document.open();
+            pdfWindow.document.write(htmlContent);
+            pdfWindow.document.close();
+            pdfWindow.print();
+        }
+    </script>
+</body>
+</html>
